@@ -3,15 +3,8 @@ from tenacity import retry, wait_random_exponential, stop_after_attempt
 import openai
 
 from .config import config
-from . import OPENAPI_API_KEY, OPENAPI_ORG_KEY
 
 MODEL = config.embedding_model
-
-#register to openai API
-openai.organization = OPENAPI_ORG_KEY
-openai.api_key = OPENAPI_ORG_KEY
-
-print(openai.Engine.list())  # check we have authenticated
 
 class Embedder:
     """A class to get embeddings from OpenAI Embedding API.
@@ -32,4 +25,5 @@ class Embedder:
         """
         results = openai.Embedding.create(input=input, model=self.model)
         embeddings = [r['embedding'] for r in results['data']]
-        return embeddings
+        results.pop('data')
+        return embeddings, results

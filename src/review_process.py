@@ -2,6 +2,7 @@ from typing import List
 from dataclasses import dataclass, field, InitVar
 
 from .api_tools import EEB
+from .utils import split_paragraphs
 
 """Classes to retrieve the peer review process including the individual referee reports linked to a preprint specified by its DOI."""
 
@@ -84,3 +85,7 @@ class Review:
         self.link_json = review['link_json']
         self.doi = review.get('doi', '')  # doi is not always present
         self.link_incontext = review['link_incontext']
+
+    def get_paragraphs(self):
+        """Get the paragraphs of the text of the review."""
+        return split_paragraphs(self.text)

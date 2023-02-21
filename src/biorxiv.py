@@ -6,7 +6,7 @@ from io import StringIO
 from typing import List
 
 from .api_tools import BioRxiv
-from .utils import innertext
+from .utils import innertext, split_paragraphs
 
 # JATS XML parser
 # not sure where DTD should live...
@@ -116,6 +116,10 @@ class Preprint:
     def _extract_text(self, elements: List[Element]) -> str:
         """Extract the innertext from list of xml etree Elements. Paragraphs are joined with double newline."""
         return '\n\n'.join([innertext(el) for el in elements])
+    
+    def get_section_paragraphs(self, section: str) -> List[str]:
+        """Return the paragraphs of a section of the preprint."""
+        return split_paragraphs(self.sections[section])
 
 @dataclass
 class BioRxivMetadata:
