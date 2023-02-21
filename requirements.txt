@@ -1,0 +1,15 @@
+python-dotenv
+nltk
+spacy
+requests
+tenacity  # check it out https://github.com/jd/tenacity
+unidecode
+lxml
+openai
+openai[pinecone-client]
+openai[datasets]
+openai[embeddings]
+jupyterlab
+ipywidgets>=7.6  # for jupyter lab
+# jupyter-dash  # You'll need jupyter-dash to add widgets such as sliders, dropdowns, and buttons to Plotly charts in JupyterLab.
+# jupyterlab-widgets

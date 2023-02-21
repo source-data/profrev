@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  profref:
+    build:
+      context: .
+      dockerfile: 'Dockerfile'
+    image: profref
+    env_file:
+    - ./.env
+    volumes:
+    - ./src:/app/src
+    - ./tests:/app/tests
+    - ./data:/data
+    - ./results:/results
+    - ./log:/log
+    - ./notebooks:/app/notebooks
+    working_dir: /app
+    ports:
+      - 8888:8888   # this allows to run jupyter notebook on --port=8888
+    command: ["jupyter-lab", "--port=8888", "--ip=0.0.0.0", "--allow-root"]

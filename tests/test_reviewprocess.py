@@ -1,17 +1,29 @@
 import unittest
 
-from ..src.review_process import ReviewProcess
+from src.review_process import ReviewProcess
 
 # Test case for testing the methods of the ReviewProcess class
 
+# https://eeb.embo.org/api/v1/doi/10.1101/2021.05.12.443743
+
+
 class TestReviewProcess(unittest.TestCase):
     # setup method
-    def setUp(self):
-        self.reviewprocess = ReviewProcess('10.1101/2020.12.31.425021')
+    @classmethod
+    def setUpClass(cls):
+        cls.reviewprocess = ReviewProcess('10.1101/2021.05.12.443743')
+        cls.review_excerpt = {
+            "1": "performed RNA-seq together with the ribosome profiling experiment, it might be interesting",
+            "2": "the PACE reporter validated, the authors can interrogate the system to gain mechanistic insights",
+            "3": "Page 13, second paragraph: More out of interest, but it is quite intriguing that GCG turned into a destabilizing codon",
+        }
 
     # test referee reports method
-    def test_referee_reports(self):
-        first_ref_report = self.reviewprocess.referee_reports()[0]
-        test_content = """In the article entitled 'Unique functions of two overlapping PAX6 retinal enhancers'"""
-        # test if test_content in the first referee reporrt
-        self.assertTrue(test_content in first_ref_report)
+    def test_reviews(self):
+        reviews = self.reviewprocess.reviews
+        self.assertEqual(len(reviews), 3)
+        for rev in reviews:
+            idx = rev.review_idx
+            content = rev.text
+            # test if test_content in the referee reporrt
+            self.assertTrue(self.review_excerpt[idx] in content)

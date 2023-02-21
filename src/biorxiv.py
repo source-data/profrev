@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field, InitVar
+from dataclasses import dataclass, field, InitVar, asdict
 from lxml.etree import tostring, fromstring, XMLParser, parse, Element
 from tenacity import retry, stop_after_attempt, wait_fixed
 import requests
@@ -8,8 +8,11 @@ from typing import List
 from .api_tools import BioRxiv
 from .utils import innertext
 
-JATS_PARSER = XMLParser(load_dtd=True, no_network=True, recover=True)
-# https://lxml.de/resolvers.html
+# JATS XML parser
+# not sure where DTD should live...
+JATS_PARSER = XMLParser(load_dtd=True, no_network=True, recover=True) # https://lxml.de/resolvers.html
+# namespace prefix to specif regex usage in XPath
+NS_RE = {"re": "http://exslt.org/regular-expressions"}
 
 """
 {
@@ -51,8 +54,30 @@ class Preprint:
         self.biorxiv_meta = BioRxivMetadata(response=response)
         xml_source = response['jatsxml']
         self.xml = self.get_jatsxml(xml_source)
+        self.sections = {
+            "introduction": self._introduction(),
+            "results": self._results(),
+            "methods": self._methods(),
+            "discussion": self._discussion()
+        }
 
-    # @retry(stop=stop_after_attempt(3), wait=wait_fixed(1))
+    @property
+    def introduction(self):
+        return self.sections['introduction']
+
+    @property
+    def results(self):
+        return self.sections['results']
+
+    @property
+    def methods(self):
+        return self.sections['methods']
+
+    @property
+    def discussion(self):
+        return self.sections['discussion']
+
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(1))
     def get_jatsxml(self, url: str) -> Element:
         """Return the JATS XML of the preprint."""
         headers = {'Accept': 'application/xml'}
@@ -65,31 +90,32 @@ class Preprint:
         root = xml.getroot()
         return root
 
-    def introduction(self) -> str:
+    def _introduction(self) -> str:
         """Extract the introduction section of the preprint using the JATS XML and the appropriate XPath."""
-        xpath = '//sec/title[text()="Introduction"]/../p'
-        return self._extract_section(xpath)
+        return self._extract_section('//sec/title[re:match(text(), "^introduction", "i")]/..//p')
 
-    def methods(self) -> str:
-        """Extract the methods section of the preprint using the JATS XML and the appropriate XPath."""
-        return self._extract_section('methods')
-
-    def results(self) -> str:
+    def _results(self) -> str:
         """Extract the results section of the preprint using the JATS XML and the appropriate XPath."""
-        return self._extract_section('results')
+        # Results, Results and Discussion
+        return self._extract_section('//sec/title[re:match(text(), "^result", "i")]/..//p')
 
-    def discussion(self) -> str:
+    def _methods(self) -> str:
+        """Extract the methods section of the preprint using the JATS XML and the appropriate XPath."""
+        return self._extract_section('//sec/title[re:match(text(), "methods", "i")]/..//p')
+
+    def _discussion(self) -> str:
         """Extract the discussion section of the preprint using the JATS XML and the appropriate XPath."""
-        return self._extract_section('discussion')
+        # Has to start with discussion to disambiguate from "Results and Discussion" combined section
+        return self._extract_section('//sec/title[re:match(text(), "^discussion", "i")]/..//p')
 
     def _extract_section(self, xpath: str) -> str:
         """Extract a section of the preprint using the JATS XML and the appropriate XPath."""
-        elements = self.xml.xpath(xpath)
+        elements = self.xml.xpath(xpath, namespaces=NS_RE)
         return self._extract_text(elements)
 
     def _extract_text(self, elements: List[Element]) -> str:
-        """Extract the innertext from list of xml etree Elements."""
-        return '\n'.join([innertext(el) for el in elements])
+        """Extract the innertext from list of xml etree Elements. Paragraphs are joined with double newline."""
+        return '\n\n'.join([innertext(el) for el in elements])
 
 @dataclass
 class BioRxivMetadata:
@@ -124,3 +150,6 @@ class BioRxivMetadata:
         self.abstract = response['abstract']
         self.published = response['published']
         self.server = response['server']
+
+    def asdict(self):
+        return asdict(self)

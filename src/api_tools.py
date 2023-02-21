@@ -39,8 +39,8 @@ class EEB(API):
         Returns:
             The referee reports.
         """
-        endpoint = f'/referee-reports/{doi}'
-        response = self._get(endpoint)
+        endpoint = f'/doi/{doi}'
+        response = self._get(endpoint)[0]
         return response
 
 

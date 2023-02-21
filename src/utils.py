@@ -23,3 +23,16 @@ def clean_text(text: str) -> str:
     clean_text = re.sub('\n\s+\n', '\n\n', text)
     return clean_text
 
+# a function that replaces dots by underscores and slashes by dashes
+def stringify_doi(doi: str) -> str:
+    """Clean a DOI by replacing dots by underscores and slashes by dashes.
+    Args:
+        doi: The DOI to clean.
+    Returns:
+        The cleaned DOI.
+    """
+    doi = doi.replace('.', '_')
+    doi = doi.replace('/', '-')
+    return doi
+
+
