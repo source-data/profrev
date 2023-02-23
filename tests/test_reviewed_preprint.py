@@ -54,7 +54,7 @@ class TestReviewedPreprint(unittest.TestCase):
         metadata_file = preprint_dir / 'metadata.json'
         self.assertTrue(metadata_file.exists())
 
-        reviews_dir = doi_dir / 'reviews'
+        reviews_dir = doi_dir / 'review_process'
         self.assertTrue(reviews_dir.exists())
 
         # list subdirectories under reviews
@@ -65,3 +65,10 @@ class TestReviewedPreprint(unittest.TestCase):
         # test if subdir are named after the review_idx
         for rev in self.reviewed_preprint.review_process.reviews:
             self.assertTrue(rev.review_idx in subdir_names)
+
+        restored_reviewed_preprint = ReviewedPreprint().from_dir(doi_dir)
+        self.assertEqual(self.reviewed_preprint.doi, restored_reviewed_preprint.doi)
+        self.assertEqual(
+            self.reviewed_preprint.preprint.biorxiv_meta,
+            restored_reviewed_preprint.preprint.biorxiv_meta
+        )

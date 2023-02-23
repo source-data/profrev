@@ -1,5 +1,5 @@
 from lxml.etree import Element
-from typing import List
+from typing import List, Callable
 import re
 
 
@@ -15,17 +15,6 @@ def innertext(el: Element) -> str:
     txt = ''.join(el.itertext())
     return txt
 
-# a function to clean up text by removing whitespaces between paragraphs
-def clean_text(text: str) -> str:
-    """Clean up text by removing whitespaces between paragraphs and replacing \rn\ by \n\n.
-    Args:
-        text: The text to clean.
-    Returns:
-        The cleaned text.
-    """
-    clean_text = re.sub('\r|\n\s+\n', '\n\n', text)
-    return clean_text
-
 # a function that replaces dots by underscores and slashes by dashes
 def stringify_doi(doi: str) -> str:
     """Clean a DOI by replacing dots by underscores and slashes by dashes.
@@ -40,12 +29,17 @@ def stringify_doi(doi: str) -> str:
 
 def split_paragraphs(text: str) -> List[str]:
     """Split text into paragraphs.
-    Args:
+    Args:   
         text: The text to split into paragraphs.
     Returns:
         A list of paragraphs.
     """
-    clean_test = clean_text(text)
-    para = clean_test.split('\n\n')
-    para = [p for p in para if p]
-    return para
+    text = re.sub('\r\n', '\n\n', text)
+    text = re.sub('\n +', '\n', text)
+    para = text.split('\n')
+    para = [p.strip() for p in para]
+    filtered = filter(lambda p: len(p) >= 70, para)
+    filtered = list(filtered)
+    return filtered
+
+doi_str_re = re.compile(r'^10_\d{4,9}-[-._;()/:A-Z0-9]+$', re.IGNORECASE)

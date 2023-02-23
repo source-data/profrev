@@ -39,3 +39,5 @@ class TestReviewedPreprint(unittest.TestCase):
         for doi_dir_str in doi_dir_str_list:
             doi_dir = self.basedir / doi_dir_str
             self.assertTrue(doi_dir.exists())
+
+        restored_corpus = Corpus().from_dir(self.basedir)

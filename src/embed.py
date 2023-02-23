@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple, Dict
 from tenacity import retry, wait_random_exponential, stop_after_attempt
 import openai
 
@@ -16,7 +16,7 @@ class Embedder:
         self.model = model
 
     @retry(wait=wait_random_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
-    def get_embedding(self, input: List[str]) -> List[List[float]]:
+    def get_embedding(self, input: List[str]) -> Tuple[List[List[float]], Dict]:
         """Get embeddings for a list of strings.
         Args:
             input: A list of strings to get embeddings for.

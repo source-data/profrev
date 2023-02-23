@@ -1,6 +1,9 @@
 import unittest
+from shutil import rmtree
+from pathlib import Path
 
-from src.biorxiv import Preprint
+from src.preprint import Preprint
+from src.utils import stringify_doi
 
 # Test case for testing the methods of the Preprint class
 
@@ -38,6 +41,27 @@ class TestPreprint(unittest.TestCase):
             "published": "10.1016/j.chom.2021.02.003",
             "server": "biorxiv"
         }
+
+        cls.basedir = Path("/tmp/test_preprint") / stringify_doi(cls.preprint.doi)
+        print(f"Creating {cls.basedir} ...")
+        cls.basedir.mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        # delete the directories created
+        print(f"Cleaning up {cls.basedir} ...")
+        rmtree(cls.basedir)
+
+    # test the introduction method
+    def test_save(self):
+        self.preprint.save(self.basedir)
+        restored_preprint = Preprint().from_dir(self.basedir)
+        self.assertEqual(restored_preprint.doi, self.preprint.doi)
+        self.assertEqual(restored_preprint.introduction, self.preprint.introduction)
+        self.assertEqual(restored_preprint.results, self.preprint.results)
+        self.assertEqual(restored_preprint.methods, self.preprint.methods)
+        self.assertEqual(restored_preprint.discussion, self.preprint.discussion)
+        self.assertEqual(restored_preprint.biorxiv_meta, self.preprint.biorxiv_meta)
 
     # test the introduction method
     def test_introduction(self):

@@ -1,11 +1,9 @@
 import unittest
 from pathlib import Path
 from shutil import rmtree
-from typing import List
 
-from src.corpus import Corpus
-from src.bipartite import EmbeddingComparator
-from src.biorxiv import Preprint
+from src.comparator import Comparator
+from src.preprint import Preprint
 from src.review_process import ReviewProcess
 from src.embed import Embedder
 from src.config import config
@@ -40,6 +38,9 @@ class TestBipartite(unittest.TestCase):
     def test_comparision(self):
         preprint_paragraphs = self.preprint.get_section_paragraphs("results")
         review_paragraphs = self.review_process.reviews[0].get_paragraphs()
-        comp = EmbeddingComparator(self.embedder)
-        similarity_matrix = comp.compare(preprint_paragraphs, review_paragraphs)
-        self.assertEqual(tuple(similarity_matrix.size()), (len(preprint_paragraphs), len(review_paragraphs)))
+        comp = Comparator(self.embedder)
+        similarity_matrix_dot = comp.compare_dot(preprint_paragraphs, review_paragraphs)
+        self.assertEqual(tuple(similarity_matrix_dot.size()), (len(preprint_paragraphs), len(review_paragraphs)))
+
+        similarity_matrix_cos = comp.compare_cosine(preprint_paragraphs, review_paragraphs)
+        self.assertEqual(tuple(similarity_matrix_cos.size()), (len(preprint_paragraphs), len(review_paragraphs)))

@@ -1,9 +1,8 @@
 python-dotenv
 nltk
-spacy
+torch
 requests
 tenacity  # check it out https://github.com/jd/tenacity
-unidecode
 lxml
 openai
 openai[pinecone-client]
