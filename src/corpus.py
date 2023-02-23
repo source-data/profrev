@@ -10,7 +10,8 @@ class Corpus:
     def __init__(self, doi_list: List[str] = []):
         self.doi_list = doi_list
         self.reviewed_preprints = [ReviewedPreprint(doi) for doi in doi_list] if doi_list else []
- 
+        assert len(doi_list) == len(self.reviewed_preprints), f"Number of DOIs ({len(doi_list)}) does not match number of reviewed preprints ({len(self.reviewed_preprints)})."
+
     def save(self, directory: str):
         """Save the corpus to a directory.
         Args:
@@ -31,3 +32,6 @@ class Corpus:
         doi_list = [reviewed_preprint.doi for reviewed_preprint in self.reviewed_preprints]
         self.doi_list = doi_list
         return self
+    
+    def __len__(self):
+        return len(self.doi_list)

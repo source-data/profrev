@@ -8,7 +8,7 @@ from src.utils import stringify_doi
 # Test case for testing the methods of the ReviewedPreprin class
 
 """"""
-class TestReviewedPreprint(unittest.TestCase):
+class TestCorpus(unittest.TestCase):
     # setup class method
     @classmethod
     def setUpClass(cls):
@@ -41,3 +41,5 @@ class TestReviewedPreprint(unittest.TestCase):
             self.assertTrue(doi_dir.exists())
 
         restored_corpus = Corpus().from_dir(self.basedir)
+        self.assertEqual(set(self.corpus.doi_list), set(restored_corpus.doi_list))
+        self.assertEqual(len(self.corpus), len(restored_corpus))

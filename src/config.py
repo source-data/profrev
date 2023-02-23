@@ -15,11 +15,13 @@ class Config:
     embedding_size: int
     # embedding_ctx_length: int
     # embedding_encoding: str
+    section: str
 
 
 config = Config(
     embedding_model="text-similarity-babbage-001",
     # embedding_ctx_length=8191,
     # embedding_encoding="cl100k_base",
-    embedding_size=2048
+    embedding_size=2048,
+    section="results",
 )
