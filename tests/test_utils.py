@@ -1,6 +1,6 @@
 import unittest
 
-from src.utils import split_paragraphs, stringify_doi
+from src.utils import split_paragraphs, split_sentences, stringify_doi
 
 
 """Test cases to test the functions of the utils module"""
@@ -52,3 +52,16 @@ In addition, the selection of the markers leis suboptimal. Although PCNA is a go
         ]
         # compare the expected and actual list of paragraphs
         self.assertEqual(paragraphs, expected)
+
+    def test_split_sentences(self):
+        text = "1. A general concern on the main conclusion of the work 'the identification of unique cell type-specific functions for these enhancers'. This is in my opinion only partially addressed by the study, as the conclusions are limited due to the absence of genetic experiments: such as deleting the enhancers in their native genomic context (either in human organoids or the homologous sequence in animal models), or at least assessing the effect of mutating their sequence in transgenesis assays in zebrafish. I understand that these functional assays may be out of the scope of the current work, but then the text should be toned down (the word 'function' is extensively used) to make clear that the authors mean just expression. I would suggest substituting the word by 'activity' in many instances."
+
+        expected = [
+            # "1.",
+            "A general concern on the main conclusion of the work 'the identification of unique cell type-specific functions for these enhancers'.",
+            "This is in my opinion only partially addressed by the study, as the conclusions are limited due to the absence of genetic experiments: such as deleting the enhancers in their native genomic context (either in human organoids or the homologous sequence in animal models), or at least assessing the effect of mutating their sequence in transgenesis assays in zebrafish.",
+            "I understand that these functional assays may be out of the scope of the current work, but then the text should be toned down (the word 'function' is extensively used) to make clear that the authors mean just expression.",
+            "I would suggest substituting the word by 'activity' in many instances.",
+        ]
+        sentences = split_sentences(text)
+        self.assertEqual(sentences, expected)

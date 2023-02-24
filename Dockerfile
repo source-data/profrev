@@ -13,7 +13,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip
 #&& pip install -r /requirements.txt
 RUN pip install python-dotenv
-# RUN pip install nltk
+RUN pip install spacy
 RUN pip install torch
 RUN pip install requests
 # check it out https://github.com/jd/tenacity
@@ -23,11 +23,12 @@ RUN pip install openai
 RUN pip install openai[pinecone-client]
 RUN pip install openai[datasets]
 RUN pip install openai[embeddings]
+RUN pip install sentence-transformers
 RUN pip install jupyterlab
  # for jupyter lab 
 RUN pip install ipywidgets>=7.6
 RUN pip install plotly==5.10.0
-
+RUN python -m spacy download en_core_web_sm
 
 FROM python:3.10-slim AS build-image
 

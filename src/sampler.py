@@ -1,10 +1,10 @@
 from random import choice, sample
-from typing import List
-import torch
+from typing import List, Callable
 
 from .corpus import Corpus
 from .comparator import Comparator
 from .embed import Embedder
+from .utils import split_paragraphs
 from .config import config
 
 MODEL = config.embedding_model
@@ -13,7 +13,13 @@ MODEL = config.embedding_model
 
 class Sampler:
 
-    def __init__(self, corpus: Corpus, n_sample: int = 1000, model: str = MODEL):
+    def __init__(
+            self,
+            corpus: Corpus,
+            n_sample: int,
+            embedder: Embedder,
+            chunking_fn: Callable = split_paragraphs
+        ):
         self.corpus = corpus
         self.n_sample = n_sample
         N = len(corpus)
@@ -25,7 +31,8 @@ class Sampler:
         for x in self.sampled_rev_preprint_indices:
            all_indices.remove(x)  # to make sure that the sampled reviews are not from the sampled preprints
         self.samples_reviews_indices = sample(all_indices, n_sample)
-        self.comparator = Comparator(embedder=Embedder(model=model))
+        self.comparator = Comparator(embedder=embedder)
+        self.chunking_fn = chunking_fn
 
     def sample(self) -> List[float]:
         """Sample a corpus of reviewed preprints."""
@@ -41,8 +48,8 @@ class Sampler:
 
         similarities = []
         for preprint, review in zip(sampled_preprint_content, sampled_review):
-            para_preprint = preprint.get_section_paragraphs(config.section)
-            para_review = review.get_paragraphs()
-            similarity = self.comparator.compare_dot(para_preprint, para_review)
+            chunks_preprint = preprint.get_chunks(self.chunking_fn, config.section)
+            chunks_review = review.get_chunks(self.chunking_fn)
+            similarity = self.comparator.compare_dot(chunks_preprint, chunks_review)
             similarities += similarity.view(-1).tolist()  # flatten the similarity matrix
         return similarities

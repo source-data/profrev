@@ -1,10 +1,10 @@
-from typing import List
+from typing import List, Callable
 from dataclasses import dataclass, field, InitVar, asdict
 from pathlib import Path
 import json
 
 from .api_tools import EEB
-from .utils import split_paragraphs
+from .utils import split_paragraphs, split_sentences
 
 """Classes to retrieve the peer review process including the individual referee reports linked to a preprint specified by its DOI."""
 
@@ -106,13 +106,16 @@ class Review:
     #     self.doi = review.get('doi', '')  # doi is not always present
     #     self.link_incontext = review['link_incontext']
 
+    def __post_init__(self, chunking_fn: Callable = split_paragraphs):
+        self.chunking_fn = chunking_fn
+
     def asdict(self):
         return asdict(self)
 
-    def get_paragraphs(self):
+    def get_chunks(self, chunking_fn: Callable = split_paragraphs):
         """Get the paragraphs of the text of the review."""
-        return split_paragraphs(self.text)
-    
+        return chunking_fn(self.text)
+
     def save(self, dir: Path):
         # save the review to file
         rev_file = dir / f'review.json'

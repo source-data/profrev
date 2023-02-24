@@ -1,7 +1,9 @@
 from lxml.etree import Element
-from typing import List, Callable
+from typing import List
+import spacy
 import re
 
+nlp = spacy.load("en_core_web_sm")
 
 # a function to extract the inner text from the JATS XML using itertext()
 def innertext(el: Element) -> str:
@@ -39,6 +41,19 @@ def split_paragraphs(text: str) -> List[str]:
     para = text.split('\n')
     para = [p.strip() for p in para]
     filtered = filter(lambda p: len(p) >= 70, para)
+    filtered = list(filtered)
+    return filtered
+
+def split_sentences(text: str) -> List[str]:
+    """Split text into sentences.
+    Args:   
+        text: The text to split into sentences.
+    Returns:
+        A list of sentences.
+    """
+    doc = nlp(text)
+    sentences = [sent.text for sent in doc.sents]
+    filtered = filter(lambda p: len(p) >= 70, sentences)
     filtered = list(filtered)
     return filtered
 

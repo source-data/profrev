@@ -5,10 +5,10 @@ import requests
 import json
 from io import StringIO
 from pathlib import Path
-from typing import List
+from typing import List, Callable
 
 from .api_tools import BioRxiv
-from .utils import innertext, split_paragraphs
+from .utils import innertext, split_paragraphs, split_sentences
 
 # JATS XML parser
 # not sure where DTD should live...
@@ -150,9 +150,9 @@ class Preprint:
         """Extract the innertext from list of xml etree Elements. Paragraphs are joined with double newline."""
         return '\n\n'.join([innertext(el) for el in elements])
     
-    def get_section_paragraphs(self, section: str) -> List[str]:
+    def get_chunks(self, chunking_fn: Callable, section: str) -> List[str]:
         """Return the paragraphs of a section of the preprint."""
-        return split_paragraphs(self.sections[section])
+        return chunking_fn(self.sections[section])
 
 @dataclass
 class BioRxivMetadata:
