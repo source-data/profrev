@@ -29,6 +29,18 @@ def stringify_doi(doi: str) -> str:
     doi = doi.replace('/', '-')
     return doi
 
+BOILERPLATE = [
+    "This preprint has been reviewed by subject experts for *Review Commons*",
+]
+
+
+def filtering(docs: List[str]) -> List[str]:
+    filtered = filter(lambda p: len(p) >= 70, docs)
+    filtered = filter(lambda p: not any(b in p for b in BOILERPLATE), filtered)
+    filtered = list(filtered)
+    return filtered
+
+
 def split_paragraphs(text: str) -> List[str]:
     """Split text into paragraphs.
     Args:   
@@ -40,8 +52,7 @@ def split_paragraphs(text: str) -> List[str]:
     text = re.sub('\n +', '\n', text)
     para = text.split('\n')
     para = [p.strip() for p in para]
-    filtered = filter(lambda p: len(p) >= 70, para)
-    filtered = list(filtered)
+    filtered = filtering(para)
     return filtered
 
 def split_sentences(text: str) -> List[str]:
@@ -53,8 +64,7 @@ def split_sentences(text: str) -> List[str]:
     """
     doc = nlp(text)
     sentences = [sent.text for sent in doc.sents]
-    filtered = filter(lambda p: len(p) >= 70, sentences)
-    filtered = list(filtered)
+    filtered = filtering(sentences)
     return filtered
 
 doi_str_re = re.compile(r'^10_\d{4,9}-[-._;()/:A-Z0-9]+$', re.IGNORECASE)
