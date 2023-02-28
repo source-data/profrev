@@ -1,4 +1,9 @@
 
+# specific to this repo
+pretrained/
+notebooks/test_corpus/
+examples/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
