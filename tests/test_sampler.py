@@ -1,11 +1,11 @@
 import unittest
 import torch
+import pandas as pd
 
 from src.corpus import Corpus
 from src.sampler import Sampler
 from src.embed import SBERTEmbedder
-from src.utils import split_paragraphs, split_sentences
-from src.config import config
+from src.utils import split_paragraphs
 
 # Test case for testing the methods of the ReviewedPreprin class
 
@@ -27,7 +27,9 @@ class TestSample(unittest.TestCase):
         cls.corpus = Corpus(doi_list=cls.doi_list)
 
     def test_sample(self):
-        sampler = Sampler(self.corpus, 2, embedder=SBERTEmbedder(), chunking_fn=split_paragraphs)
-        distro = sampler.sample()
-        self.assertGreater(len(distro), 0)
-        self.assertEqual(torch.Tensor(distro).dim(), 1)
+        sampler = Sampler(self.corpus, embedder=SBERTEmbedder(), chunking_fn=split_paragraphs)
+        distros = sampler.sample(n_sample=2)
+        self.assertGreater(len(distros['null']), 0)
+        self.assertGreater(len(distros['enriched']), 0)
+        self.assertEqual(torch.Tensor(distros['null']).dim(), 1)
+        self.assertEqual(torch.Tensor(distros['enriched']).dim(), 1)

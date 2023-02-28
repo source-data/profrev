@@ -8,13 +8,12 @@ from pathlib import Path
 from typing import List, Callable
 
 from .api_tools import BioRxiv
-from .utils import innertext, split_paragraphs, split_sentences
+from .utils import innertext
+from .config import config
 
 # JATS XML parser
 # not sure where DTD should live...
 JATS_PARSER = XMLParser(load_dtd=True, no_network=True, recover=True) # https://lxml.de/resolvers.html
-# namespace prefix to specif regex usage in XPath
-NS_RE = {"re": "http://exslt.org/regular-expressions"}
 
 """
 {
@@ -61,7 +60,7 @@ class Preprint:
         self.doi = doi
         response = BioRxiv().get_preprint(doi)
         self.biorxiv_meta = BioRxivMetadata(data=response)
-        xml_source = response['jatsxml']
+        xml_source = response['jatsxml']  # nice! For ex jatsxml: "https://www.biorxiv.org/content/early/2018/06/05/339747.source.xml"
         xml = self.get_jatsxml(xml_source)
         self.sections = {
             "introduction": self._introduction(xml),
@@ -143,16 +142,26 @@ class Preprint:
 
     def _extract_section(self, xpath: str, xml: Element) -> str:
         """Extract a section of the preprint using the JATS XML and the appropriate XPath."""
-        elements = xml.xpath(xpath, namespaces=NS_RE)
+        elements = xml.xpath(xpath, namespaces={"re": "http://exslt.org/regular-expressions"})  # namespace prefix to enable regex usage in XPath
         return self._extract_text(elements)
 
     def _extract_text(self, elements: List[Element]) -> str:
         """Extract the innertext from list of xml etree Elements. Paragraphs are joined with double newline."""
         return '\n\n'.join([innertext(el) for el in elements])
     
-    def get_chunks(self, chunking_fn: Callable, section: str) -> List[str]:
-        """Return the paragraphs of a section of the preprint."""
-        return chunking_fn(self.sections[section])
+    def get_chunks(self, chunking_fn: Callable, sections: List[str] = config.sections) -> List[str]:
+        """Return the paragraphs of a sections of the preprint.
+        Args:L
+            chunking_fn: The function to use to chunk the text.
+            sections: The sections to extract. Can be a combination of 'introduction', 'results', 'methods', 'discussion' using the '+' operator.
+        Returns:
+            A list of chunks.
+        """
+        sections = sections.split('+')
+        chunks = []
+        for section in sections:
+            chunks += chunking_fn(self.sections[section])
+        return chunks
 
 @dataclass
 class BioRxivMetadata:

@@ -1,8 +1,6 @@
 import torch
 from typing import List, Tuple
 
-from src.preprint import Preprint
-from src.review_process import Review
 from src.embed import Embedder
 
 
@@ -18,11 +16,8 @@ class Comparator:
         Returns:
             A list of embeddings, one for each string in the input.
         """
-        embeddings_1, _ = self.embedder.get_embedding(para_1)
-        embeddings_2, _ = self.embedder.get_embedding(para_2)
-        # get tensors
-        embeddings_1 = torch.tensor(list(embeddings_1))
-        embeddings_2 = torch.tensor(list(embeddings_2))
+        embeddings_1, _ = self.embedder.get_embedding(para_1)  # num_examples x embedding_dim
+        embeddings_2, _ = self.embedder.get_embedding(para_2)  # num_examples x embedding_dim
         return embeddings_1, embeddings_2
 
     def compare_dot(self, para_1: List[str], para_2: List[str]) -> torch.Tensor:

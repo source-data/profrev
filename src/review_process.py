@@ -1,10 +1,10 @@
 from typing import List, Callable
-from dataclasses import dataclass, field, InitVar, asdict
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 import json
 
 from .api_tools import EEB
-from .utils import split_paragraphs, split_sentences
+from .utils import split_paragraphs
 
 """Classes to retrieve the peer review process including the individual referee reports linked to a preprint specified by its DOI."""
 
