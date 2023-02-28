@@ -24,9 +24,12 @@ RUN pip install openai[pinecone-client]
 RUN pip install openai[datasets]
 RUN pip install openai[embeddings]
 RUN pip install sentence-transformers
+RUN pip install transformers
 RUN pip install jupyterlab
+# RUN pip install ipykernel
  # for jupyter lab 
 RUN pip install ipywidgets>=7.6
+RUN pip install jupyterlab-widgets
 RUN pip install plotly==5.10.0
 RUN python -m spacy download en_core_web_sm
 

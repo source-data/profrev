@@ -11,8 +11,7 @@ services:
     volumes:
     - ./src:/app/src
     - ./tests:/app/tests
-    - ./data:/data
-    - ./results:/results
+    - ./pretrained:/app/pretrained
     - ./log:/log
     - ./notebooks:/app/notebooks
     working_dir: /app
