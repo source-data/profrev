@@ -4,7 +4,7 @@ services:
   profrev:
     build:
       context: .
-      dockerfile: 'Dockerfile'
+      dockerfile: 'compose/python/Dockerfile'
     image: profref
     env_file:
     - ./.env
@@ -12,9 +12,33 @@ services:
     - ./src:/app/src
     - ./tests:/app/tests
     - ./pretrained:/app/pretrained
+    - ./img:/app/img
+    - ./data:/app/data
     - ./log:/log
     - ./notebooks:/app/notebooks
+    - vs_server:/root/.vscode-server
+    - cache:/root/.cache
     working_dir: /app
     ports:
       - 8888:8888   # this allows to run jupyter notebook on --port=8888
-    command: ["jupyter-lab", "--port=8888", "--ip=0.0.0.0", "--allow-root"]
+      - 8050:8050   # this allows to run Dash on
+    command: ["jupyter-lab", "--port=8888", "--ip=0.0.0.0", "--allow-root", "--allow_origin='*'"]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: 'compose/node/Dockerfile'
+    image: frontend
+    volumes:
+    - ./webapp:/app
+    # https://stackoverflow.com/questions/30043872/docker-compose-node-modules-not-present-in-a-volume-after-npm-install-succeeds
+    - node_modules:/app/node_modules
+    working_dir: /app
+    ports:
+      - 8080:8080
+    command: ["npm", "run", "dev"]
+
+volumes:
+  vs_server:
+  node_modules:
+  cache:

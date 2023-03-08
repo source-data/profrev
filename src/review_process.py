@@ -1,4 +1,4 @@
-from typing import List, Callable
+from typing import List, Callable, Optional
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 import json
@@ -14,13 +14,14 @@ class ReviewProcess:
     api = EEB()
 
     """A class to represent the review process for an article based on the response of the EEB API."""
-    def __init__(self, doi: str =  None):
-        self.doi = None
-        self.reviews = []
+    def __init__(self, doi: Optional[str] =  None):
         if doi is not None:
             self.doi = doi
             response = self.api.get_referee_reports(doi)
             self.reviews = self._reviews(response)
+        else:
+            self.doi = None
+            self.reviews = []
 
     def _reviews(self, response: dict) -> List['Review']:
         """Get the referee reports for the article."""
@@ -50,7 +51,7 @@ class Review:
     posting_date: str = field(default="")  #  "2020-09-09T12:18:53.424343+00:00",
     hypothesis_id:str = field(default="")    # "oDimTPKWEeqldYv8lyZT3A",
     review_idx: str = field(default="")    # "1",
-    tags: List[str] = ""    # ["PeerReviewed"],
+    tags: List[str] = field(default_factory=list)    # ["PeerReviewed"],
     related_article_uri: str = field(default="")    # "https://www.biorxiv.org/content/10.1101/2020.05.14.095968v1",
     highlight: str  = ""   # "...",
     related_article_doi: str = field(default="")    # "10.1101/2020.05.14.095968",

@@ -3,6 +3,8 @@ from typing import List
 import spacy
 import re
 
+from .config import config
+
 nlp = spacy.load("en_core_web_sm")
 
 # a function to extract the inner text from the JATS XML using itertext()
@@ -35,7 +37,7 @@ BOILERPLATE = [
 
 
 def filtering(docs: List[str]) -> List[str]:
-    filtered = filter(lambda p: len(p) >= 70, docs)
+    filtered = filter(lambda p: len(p) >= config.min_length, docs)
     filtered = filter(lambda p: not any(b in p for b in BOILERPLATE), filtered)
     filtered = list(filtered)
     return filtered

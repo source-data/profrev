@@ -10,8 +10,8 @@ class TestLatentEmbedding(unittest.TestCase):
     # setup class method
     @classmethod
     def setUpClass(cls):
-        cls.sentence = "This is a sentence."
-        cls.paragraph = "This is a paragraph. This is another paragraph."
+        cls.sentence = ["This is a sentence."]
+        cls.paragraph = ["This is a paragraph. This is another paragraph."]
 
     def test_latent_embedding(self):
         # test that the latent embedding model can be loaded

@@ -5,7 +5,7 @@ import pandas as pd
 from src.corpus import Corpus
 from src.sampler import Sampler
 from src.embed import SBERTEmbedder
-from src.utils import split_paragraphs
+from src.utils import split_paragraphs, split_sentences
 
 # Test case for testing the methods of the ReviewedPreprin class
 
@@ -28,6 +28,14 @@ class TestSample(unittest.TestCase):
 
     def test_sample(self):
         sampler = Sampler(self.corpus, embedder=SBERTEmbedder(), chunking_fn=split_paragraphs)
+        distros = sampler.sample(n_sample=2)
+        self.assertGreater(len(distros['null']), 0)
+        self.assertGreater(len(distros['enriched']), 0)
+        self.assertEqual(torch.Tensor(distros['null']).dim(), 1)
+        self.assertEqual(torch.Tensor(distros['enriched']).dim(), 1)
+
+    def test_sample_with_two_embedders(self):
+        sampler = Sampler(self.corpus, embedder=[SBERTEmbedder(), SBERTEmbedder()], chunking_fn=[split_sentences, split_paragraphs])
         distros = sampler.sample(n_sample=2)
         self.assertGreater(len(distros['null']), 0)
         self.assertGreater(len(distros['enriched']), 0)

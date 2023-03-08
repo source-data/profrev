@@ -42,7 +42,10 @@ class TestPreprint(unittest.TestCase):
             "server": "biorxiv"
         }
 
-        cls.basedir = Path("/tmp/test_preprint") / stringify_doi(cls.preprint.doi)
+        if cls.preprint.doi is not None:
+            cls.basedir = Path("/tmp/test_preprint") / stringify_doi(cls.preprint.doi)
+        else:
+            raise ValueError("DOI is None")
         print(f"Creating {cls.basedir} ...")
         cls.basedir.mkdir(parents=True, exist_ok=True)
 
@@ -82,11 +85,11 @@ class TestPreprint(unittest.TestCase):
         self.assertTrue(methods.endswith(self.methods_end))
 
     # test the discussion method
-    def test_methods(self):
+    def test_discussion(self):
         discussion = self.preprint.discussion
         self.assertTrue(discussion.startswith(self.discussion_start))
         self.assertTrue(discussion.endswith(self.discussion_end))
 
     def test_biorxiv_meta(self):
         meta = self.preprint.biorxiv_meta  # this is a dataclass
-        self.assertEqual(meta.asdict(), self.meta)
+        self.assertEqual(meta.asdict(), self.meta)  # type: ignore[reportOptionalMemberAccess]

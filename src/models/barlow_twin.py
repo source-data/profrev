@@ -19,23 +19,64 @@ import logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
 
+def compute_mmd_loss(z: torch.Tensor, iterations: int) -> torch.Tensor:
+    # https://github.com/napsternxg/pytorch-practice/blob/master/Pytorch%20-%20MMD%20VAE.ipynb
+    z_dim = z.size(-1)
+    z_samples = sample_z(z_dim, iterations)
+    z_loss = mmd(z_samples, z)
+    return z_loss
+
+
+def compute_kl_loss(mean: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+    # https://github.com/timbmg/Sentence-VAE/blob/master/train.py
+    kl = -0.5 * (1 + logvar - mean.pow(2) - logvar.exp())
+    return kl.sum()  # or kl mean()??
+
+
+def monte_carlo_kl_divergence(z, mu, std):
+    # https://towardsdatascience.com/variational-autoencoder-demystified-with-pytorch-implementation-3a06bee395ed
+    # this has the advantage that one can choose the distribution, and in particular, mu and std
+    # --------------------------
+    # Monte carlo KL divergence
+    # --------------------------
+    # 1. define the first two probabilities (in this case Normal for both)
+    p = torch.distributions.Normal(torch.zeros_like(mu), torch.ones_like(std))  # N(0, 1) could be somethign else
+    q = torch.distributions.Normal(mu, std)
+
+    # 2. get the probabilities from the equation
+    log_qzx = q.log_prob(z)
+    log_pz = p.log_prob(z)
+
+    # kl
+    kl = (log_qzx - log_pz)
+
+    # sum over last dim to go from single dim distribution to multi-dim
+    kl = kl.sum(-1)
+    return kl.mean()  # or kl.sum()?
+
+
 def compute_loss_on_twins(z: List[torch.Tensor]) -> torch.Tensor:
     assert len(z) == 2, "for the moment, this works only on twin pairs, not for higher order"
     assert z[0].size() == z[1].size(), "z dims have to be equal for square cross correl matrix"
     # z = [t.cpu() for t in z]
     batch_size, z_dim = z[0].size()
     c = (z[0].T @ z[1]) / batch_size
-    diag = c.diagonal()
-    off_diag = c - torch.diag_embed(diag)
-    loss_diag = (diag - 1) ** 2
-    loss_off_diag = off_diag ** 2
-    loss_diag = loss_diag.sum() / z_dim  # num elements of diag scales as n
-    loss_off_diag = loss_off_diag.sum() / ((z_dim ** 2) - z_dim)  # num elements off_diag roughly scales as n^2 - n
-    # if torch.cuda.is_available():
-    #     loss_diag = loss_diag.cuda()
-    #     loss_off_diag = loss_off_diag.cuda()
-    #     c = c.cuda()
-    return loss_diag, loss_off_diag, c
+    diag_c = c.diagonal()
+    off_diag_c = c - torch.diag_embed(diag_c)
+    loss_diag_c = (diag_c - 1) ** 2
+    loss_off_diag_c = off_diag_c ** 2
+    loss_diag_c = loss_diag_c.sum() / z_dim  # num elements of diag scales as n
+    loss_off_diag_c = loss_off_diag_c.sum() / ((z_dim ** 2) - z_dim)  # num elements off_diag roughly scales as n^2 - n
+
+    d = (z[0] @ z[1].T) / z_dim
+    diag_d = d.diagonal()
+    off_diag_d = d - torch.diag_embed(diag_d)
+    loss_diag_d = (diag_d - 1) ** 2
+    loss_off_diag_d = off_diag_d ** 2
+    loss_diag_d = loss_diag_d.sum() / batch_size  # num elements of diag scales as z_dim
+    loss_off_diag_d = loss_off_diag_d.sum() / ((batch_size ** 2) - batch_size)  # num elements off_diag roughly scales as z_dim^2 - z_dim
+
+    return loss_diag_c, loss_off_diag_c, c, loss_diag_d, loss_off_diag_d, d
 
 
 class LatentConfig(BartConfig):
@@ -91,11 +132,11 @@ class LatentConfig(BartConfig):
 
 class TwinConfig(LatentConfig):
 
-    def __init__(self, lambd: float = None, mu: float = 1.0, **kwargs):
+    def __init__(self, lambd: float = None, mu: float = 1.0, twin_loss: str = None, **kwargs):
         super().__init__(**kwargs)
         self.lambd = lambd  # not a typo; weight on off diagonal terms of twin loss
         self.mu = mu  # weight twin z loss vs the other losses
-
+        self.twin_loss = twin_loss # None, "diag_c", "diag_d", "diag_diag"
 
 class TwinLMConfig(TwinConfig):
 
@@ -213,38 +254,38 @@ class LatentEncoder(BartEncoder):
         y = y.view(batch_size, (self.seq_length * self.hidden_features))  # B x (L * H)  (example: 32 * 65_536)
         # latent var
         y = self.vae_dropout(y)
-        # if self.latent_var_loss == "mmd":
-        #     z = self.fc_z_1(y)  # -> B x Z  (example: 32 example x 128 dimensional latent var)
-        #     z = self.norm_z(z)
-        #     loss = compute_mmd_loss(z, self.sampling_iterations)
-        #     representation = z
-        # elif self.latent_var_loss == "kl":
-        #     z_mean = self.fc_z_mean(y)  # -> B x Z
-        #     z_logvar = self.fc_z_logvar(y)  # -> B x Z
-        #     z_std = torch.exp(0.5 * z_logvar)
-        #     # z = sample_z(self.z_dim, batch_size)
-        #     # z = z + z_mean + z_std
-        #     q = torch.distributions.Normal(z_mean, z_std)
-        #     z = q.rsample()
-        #     representation = self.norm_z(z_mean)  # for twin cross correlation: take latent before sampling
-        #     loss = compute_kl_loss(z_mean, z_logvar)
-        # elif self.latent_var_loss == "kl-mc":
-        #     z_mean = self.fc_z_mean(y)  # -> B x Z
-        #     z_logvar = self.fc_z_logvar(y)  # -> B x Z
-        #     z_std = torch.exp(0.5 * z_logvar / 2)
-        #     q = torch.distributions.Normal(z_mean, z_std)
-        #     z = q.rsample()
-        #     representation = self.norm_z(z_mean)  # for twin cross correlation: take latent before sampling
-        #     loss = monte_carlo_kl_divergence(z, z_mean, z_std)
-        # elif self.latent_var_loss is None:
-        z = self.fc_z_1(y)  # -> B x Z  (example: 32 example x 128 dimensional latent var)
-        z = self.norm_z(z)
-        loss = torch.tensor(0)
-        if torch.cuda.is_available():
-            loss = loss.cuda()
-        representation = z
-        # else:
-        #     raise ValueError(f"unknown loss type on latent variable {self.latent_var_loss}")
+        if self.latent_var_loss == "mmd":
+            z = self.fc_z_1(y)  # -> B x Z  (example: 32 example x 128 dimensional latent var)
+            z = self.norm_z(z)
+            loss = compute_mmd_loss(z, self.sampling_iterations)
+            representation = z
+        elif self.latent_var_loss == "kl":
+            z_mean = self.fc_z_mean(y)  # -> B x Z
+            z_logvar = self.fc_z_logvar(y)  # -> B x Z
+            z_std = torch.exp(0.5 * z_logvar)
+            # z = sample_z(self.z_dim, batch_size)
+            # z = z + z_mean + z_std
+            q = torch.distributions.Normal(z_mean, z_std)
+            z = q.rsample()
+            representation = self.norm_z(z_mean)  # for twin cross correlation: take latent before sampling
+            loss = compute_kl_loss(z_mean, z_logvar)
+        elif self.latent_var_loss == "kl-mc":
+            z_mean = self.fc_z_mean(y)  # -> B x Z
+            z_logvar = self.fc_z_logvar(y)  # -> B x Z
+            z_std = torch.exp(0.5 * z_logvar / 2)
+            q = torch.distributions.Normal(z_mean, z_std)
+            z = q.rsample()
+            representation = self.norm_z(z_mean)  # for twin cross correlation: take latent before sampling
+            loss = monte_carlo_kl_divergence(z, z_mean, z_std)
+        elif self.latent_var_loss is None:
+            z = self.fc_z_1(y)  # -> B x Z  (example: 32 example x 128 dimensional latent var)
+            z = self.norm_z(z)
+            loss = torch.tensor(0)
+            if torch.cuda.is_available():
+                loss = loss.cuda()
+            representation = z
+        else:
+            raise ValueError(f"unknown loss type on latent variable {self.latent_var_loss}")
 
         supp_data = {
             "loss_z": loss,
@@ -456,12 +497,17 @@ class Twin(MyPreTrainedModel):
         )
 
     def all_losses(self, outputs):
-        loss_diag, loss_off_diag, cross_correl = compute_loss_on_twins([out.representation for out in outputs])
+        loss_diag_c, loss_off_diag_c, c, loss_diag_d, loss_off_diag_d, d = compute_loss_on_twins([out.representation for out in outputs])
         losses = torch.stack([out.loss for out in outputs])
-        losses = losses.sum()
-        loss_twin_z = self.mu * (loss_diag + self.lambd * loss_off_diag)
-        loss = losses + loss_twin_z
-        return loss, loss_twin_z, loss_diag, loss_off_diag, cross_correl
+        loss = losses.sum()
+        if self.config.twin_loss is not None:
+            if self.config.twin_loss in ['diag_c', 'diag_diag']:
+                loss_twin_z_c = self.mu * (loss_diag_c + self.lambd * loss_off_diag_c)
+                loss = loss + loss_twin_z_c
+            if self.config.twin_loss in ['diag_d', 'diag_diag']:
+                loss_twin_z_d = self.mu * (loss_diag_d + self.lambd * loss_off_diag_d)
+                loss = loss + loss_twin_z_d
+        return loss, loss_diag_c, loss_off_diag_c, c, loss_diag_d, loss_off_diag_d, d
 
     @staticmethod
     def update_supp_data(supp_data, outputs):

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Any
 
 from tenacity import retry, stop_after_attempt, wait_fixed
 import requests
@@ -10,7 +10,7 @@ import requests
 class API:
     """An abstract class to represent an API."""
     def __init__(self) -> None:
-        self.base_url = None
+        self.base_url = ""
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(1))
     def _get(self, endpoint: str) -> dict:
@@ -32,7 +32,7 @@ class EEB(API):
         self.base_url = 'https://eeb.embo.org/api/v1'
 
 
-    def get_referee_reports(self, doi: str) -> List[str]:
+    def get_referee_reports(self, doi: str) -> Dict[str, Any]:
         """Get the referee reports for an article from the Early Evidence Base API.
         Args:
             doi: The DOI of the article to get the referee reports for.
@@ -40,8 +40,10 @@ class EEB(API):
             The referee reports.
         """
         endpoint = f'/doi/{doi}'
-        response = self._get(endpoint)[0]
-        return response
+        response = self._get(endpoint)
+        if not response:
+            raise ValueError(f'No referee reports found for {doi}')
+        return response[0]
 
 
 class BioRxiv(API):
@@ -50,7 +52,7 @@ class BioRxiv(API):
     def __init__(self) -> None:
          self.base_url = 'https://api.biorxiv.org'
     
-    def get_preprint(self, doi: str) -> str:
+    def get_preprint(self, doi: str) -> Dict[str, Any]:
         """Get the preprint full text from the BioRxiv API.
         Args:
             doi: The DOI of the article to get.
@@ -59,4 +61,9 @@ class BioRxiv(API):
         """
         endpoint = f'/details/biorxiv/{doi}'
         response = self._get(endpoint)
-        return response['collection'][0]
+        try:
+            preprint = response['collection'][0]
+        except Exception as e:
+            print(f'No preprint found for {doi}')
+            raise e
+        return preprint

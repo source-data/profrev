@@ -12,7 +12,7 @@ class Corpus:
         self.reviewed_preprints = [ReviewedPreprint(doi) for doi in doi_list] if doi_list else []
         assert len(doi_list) == len(self.reviewed_preprints), f"Number of DOIs ({len(doi_list)}) does not match number of reviewed preprints ({len(self.reviewed_preprints)})."
 
-    def save(self, directory: str):
+    def save(self, directory: Path):
         """Save the corpus to a directory.
         Args:
             directory: The directory to save the corpus in.
@@ -20,7 +20,7 @@ class Corpus:
         for reviewed_preprint in self.reviewed_preprints:
             reviewed_preprint.save(directory)
 
-    def from_dir(self, directory: str):
+    def from_dir(self, directory: Path):
         """Load the corpus from a directory that contains reviewed preprints.
         Each reviewed preprint is in a directory named after its DOI.
         Args:

@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field, InitVar, asdict
-from lxml.etree import tostring, fromstring, XMLParser, parse, Element
+from lxml.etree import XMLParser, parse, Element
 from tenacity import retry, stop_after_attempt, wait_fixed
 import requests
 import json
 from io import StringIO
 from pathlib import Path
-from typing import List, Callable
+from typing import List, Callable, Dict, Any, Optional, Tuple
 
 from .api_tools import BioRxiv
 from .utils import innertext
@@ -34,6 +34,47 @@ JATS_PARSER = XMLParser(load_dtd=True, no_network=True, recover=True) # https://
 }
 """
 
+
+@dataclass
+class BioRxivMetadata:
+    """extract the biorxiv metadata from the API response"""
+    doi: str = field(default='')
+    title: str = field(default='')
+    authors: str = field(default='')
+    author_corresponding: str = field(default='')
+    author_corresponding_institution: str = field(default='')
+    date: str = field(default='')
+    version: str = field(default='')
+    type: str = field(default='')
+    license: str = field(default='')
+    category: str = field(default='')
+    abstract: str = field(default='')
+    published: str = field(default='')
+    server: str = field(default='')
+
+    data: InitVar[Optional[Dict[str, Any]]] = None
+
+    def __post_init__(self, data: Optional[Dict[str, Any]]):
+        if data:
+            # only a subset of the data fields are used
+            self.doi = data['doi']
+            self.title = data['title']
+            self.authors = data['authors']
+            self.author_corresponding = data['author_corresponding']
+            self.author_corresponding_institution = data['author_corresponding_institution']
+            self.date = data['date']
+            self.version = data['version']
+            self.type = data['type']
+            self.license = data['license']
+            self.category = data['category']
+            self.abstract = data['abstract']
+            self.published = data['published']
+            self.server = data['server']
+
+    def asdict(self):
+        return asdict(self)
+
+
 class Preprint:
     """Parse the JATS XML to extract metadata and full text of a bioRixv preprint.
 
@@ -43,41 +84,54 @@ class Preprint:
         sections: The sections of the preprint.
     """
 
-    def __init__(self, doi: str = None):
+    def __init__(self, doi: Optional[str] = None):
         """Initialize the Preprint object.
         """
-        self.doi = None
-        self.biorxiv_meta = None
-        self.sections = {}
+        self.doi = doi
         if doi is not None:
-            self.from_biorxiv_api(doi)
+            self.biorxiv_meta, self.sections = self._from_biorxiv_api(doi)
+        else:
+            self.biorxiv_meta = None
+            self.sections = {
+                "introduction": "",
+                "results": "",
+                "methods": "",
+                "discussion": ""
+            }
 
-    def from_biorxiv_api(self, doi: str):
+
+    def _from_biorxiv_api(self, doi: str) -> Tuple[BioRxivMetadata, Dict[str, str]]:
         """Initialize the Preprint object from the bioRxiv API.
         Args:
             doi: The DOI of the preprint.
         """
-        self.doi = doi
         response = BioRxiv().get_preprint(doi)
-        self.biorxiv_meta = BioRxivMetadata(data=response)
+        biorxiv_meta = BioRxivMetadata(data=response)
         xml_source = response['jatsxml']  # nice! For ex jatsxml: "https://www.biorxiv.org/content/early/2018/06/05/339747.source.xml"
         xml = self.get_jatsxml(xml_source)
-        self.sections = {
+        sections = {
             "introduction": self._introduction(xml),
             "results": self._results(xml),
             "methods": self._methods(xml),
             "discussion": self._discussion(xml)
         }
+        return biorxiv_meta, sections
 
     def save(self, dir: Path):
-        for sec, content in self.sections.items():
-            sec_file = dir / f'{sec}.txt'
-            with open(sec_file, 'w') as f:
-                f.write(content)
-        metadata_file = dir / 'metadata.json'
-        with open(metadata_file, 'w') as jf:
-            biorxiv_meta = self.biorxiv_meta.asdict()
-            json.dump(biorxiv_meta, jf, indent=4)
+        if any(self.sections.values()):
+            for sec, content in self.sections.items():
+                sec_file = dir / f'{sec}.txt'
+                with open(sec_file, 'w') as f:
+                    f.write(content)
+        else:
+            raise ValueError('No sections to save')
+        if self.biorxiv_meta is not None:
+            metadata_file = dir / 'metadata.json'
+            with open(metadata_file, 'w') as jf:
+                biorxiv_meta = self.biorxiv_meta.asdict()
+                json.dump(biorxiv_meta, jf, indent=4)
+        else:
+            raise ValueError('No metadata to save')
 
     def from_dir(self, dir: Path):
         self.sections = {}
@@ -149,7 +203,7 @@ class Preprint:
         """Extract the innertext from list of xml etree Elements. Paragraphs are joined with double newline."""
         return '\n\n'.join([innertext(el) for el in elements])
     
-    def get_chunks(self, chunking_fn: Callable, sections: List[str] = config.sections) -> List[str]:
+    def get_chunks(self, chunking_fn: Callable, sections: str = config.sections) -> List[str]:
         """Return the paragraphs of a sections of the preprint.
         Args:L
             chunking_fn: The function to use to chunk the text.
@@ -157,46 +211,8 @@ class Preprint:
         Returns:
             A list of chunks.
         """
-        sections = sections.split('+')
+        section_list = sections.split('+')
         chunks = []
-        for section in sections:
+        for section in section_list:
             chunks += chunking_fn(self.sections[section])
         return chunks
-
-@dataclass
-class BioRxivMetadata:
-    """extract the biorxiv metadata from the API response"""
-    doi: str = field(default='')
-    title: str = field(default='')
-    authors: str = field(default='')
-    author_corresponding: str = field(default='')
-    author_corresponding_institution: str = field(default='')
-    date: str = field(default='')
-    version: str = field(default='')
-    type: str = field(default='')
-    license: str = field(default='')
-    category: str = field(default='')
-    abstract: str = field(default='')
-    published: str = field(default='')
-    server: str = field(default='')
-
-    data: InitVar = None
-
-    def __post_init__(self, data: dict):
-        # only a subset of the data fields are used
-        self.doi = data['doi']
-        self.title = data['title']
-        self.authors = data['authors']
-        self.author_corresponding = data['author_corresponding']
-        self.author_corresponding_institution = data['author_corresponding_institution']
-        self.date = data['date']
-        self.version = data['version']
-        self.type = data['type']
-        self.license = data['license']
-        self.category = data['category']
-        self.abstract = data['abstract']
-        self.published = data['published']
-        self.server = data['server']
-
-    def asdict(self):
-        return asdict(self)

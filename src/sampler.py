@@ -1,5 +1,5 @@
 from random import choice, sample
-from typing import List, Callable
+from typing import List, Callable, Dict
 
 from .corpus import Corpus
 from .comparator import Comparator
@@ -15,16 +15,20 @@ class Sampler:
     def __init__(
             self,
             corpus: Corpus,
-            embedder: Embedder,
-            chunking_fn: Callable = split_paragraphs
+            embedder: List[Embedder],
+            chunking_fn: List[Callable] = [split_paragraphs, split_paragraphs]
         ):
         self.corpus = corpus
         self.N = len(corpus)
+        if not isinstance(embedder, list):
+            embedder = [embedder, embedder]
         self.comparator = Comparator(embedder=embedder)
-        self.chunking_fn = chunking_fn
+        if not isinstance(chunking_fn, list):
+            chunking_fn = [chunking_fn, chunking_fn]
+        self.chunking_fn = {"review": chunking_fn[0], "preprint": chunking_fn[1]}
 
-    def sample(self, n_sample: int) -> List[float]:
-        assert self.N >= 2 * n_sample, f"Number of preprints ({N}) must be greater than twice the number of samples ({n_sample})."
+    def sample(self, n_sample: int) -> Dict[str, List[float]]:
+        assert self.N >= 2 * n_sample, f"Number of preprints ({self.N}) must be greater than twice the number of samples ({n_sample})."
         
         all_indices = list(range(self.N))
 
@@ -36,11 +40,12 @@ class Sampler:
         sampled_cognate_review_chunks: List[List[str]] = []
         for i in sampled_rev_preprint_indices:
             rev_preprint = self.corpus.reviewed_preprints[i]
-            sampled_preprint_chunks.append(rev_preprint.preprint.get_chunks(self.chunking_fn, config.sections))
-
-            reviews = rev_preprint.review_process.reviews
-            review = choice(reviews)  # take one random review from the reviews of the preprint
-            sampled_cognate_review_chunks.append(review.get_chunks(self.chunking_fn))
+            preprint = rev_preprint.preprint
+            if preprint is not None and rev_preprint.review_process is not None:
+                sampled_preprint_chunks.append(preprint.get_chunks(self.chunking_fn["preprint"], config.sections))
+                reviews = rev_preprint.review_process.reviews
+                review = choice(reviews)  # take one random review from the reviews of the preprint
+                sampled_cognate_review_chunks.append(review.get_chunks(self.chunking_fn["review"]))
         similarities_enriched = self._compare(sampled_preprint_chunks, sampled_cognate_review_chunks)
 
         # similarity scores between non-cognate reviews and preprints
@@ -52,9 +57,11 @@ class Sampler:
         samples_non_cognate_indices = sample(all_indices, n_sample)
         sampled_non_cognate_review_chunks: List[List[str]] = []
         for i in samples_non_cognate_indices:
-            reviews = self.corpus.reviewed_preprints[i].review_process.reviews
-            review = choice(reviews)  # take one random review from the reviews of the preprint
-            sampled_non_cognate_review_chunks.append(review.get_chunks(self.chunking_fn)) 
+            rev_preprint = self.corpus.reviewed_preprints[i]
+            if rev_preprint.review_process is not None:
+                reviews = rev_preprint.review_process.reviews
+                review = choice(reviews)  # take one random review from the reviews of the preprint
+                sampled_non_cognate_review_chunks.append(review.get_chunks(self.chunking_fn["review"])) 
         similarities_null = self._compare(sampled_preprint_chunks, sampled_non_cognate_review_chunks)
 
         return {
@@ -63,7 +70,7 @@ class Sampler:
         }
     
     def _compare(self, chunk_list_1: List[List[str]], chunk_list_2: List[List[str]]) -> List[float]:
-        assert len(chunk_list_1) == len(chunk_list_2), "The number of chunks in the two chunk lists must be the same."
+        assert len(chunk_list_1) == len(chunk_list_2), "The number of examples in the two chunk lists must be the same."
         similarities = []
         for chunks_1, chunks_2 in zip(chunk_list_1, chunk_list_2):
             s = self.comparator.compare_dot(chunks_1, chunks_2)

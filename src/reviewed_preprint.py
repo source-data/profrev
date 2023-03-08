@@ -1,5 +1,5 @@
 from pathlib import Path
-import json
+from typing import Optional
 
 from .review_process import ReviewProcess
 from .preprint import Preprint
@@ -10,14 +10,15 @@ from .utils import stringify_doi
 
 class ReviewedPreprint: 
     """A class to represent a reviewed preprint and save it to disk"""
-    def __init__(self, doi: str = None):
-        self.doi = None
-        self.review_process = None
-        self.preprint = None
+    def __init__(self, doi: Optional[str] = None):
         if doi is not None:
             self.doi = doi
             self.review_process = ReviewProcess(self.doi)
             self.preprint = Preprint(self.doi)
+        else:
+            self.doi = None
+            self.review_process = None
+            self.preprint = None
 
     def from_objects(self, preprint: Preprint, review_process: ReviewProcess):
         self.doi = preprint.doi
@@ -25,14 +26,17 @@ class ReviewedPreprint:
         self.preprint = preprint
         self.review_process = review_process
 
-    def save(self, directory: str) -> None:
+    def save(self, directory: Path) -> None:
         """Save the referee report to a file.        Args:
             directory: The directory to save the file in.
         """
-        doi_dir = Path(directory) / stringify_doi(self.doi)
-        doi_dir.mkdir(parents=True, exist_ok=True)
-        self._save_reviews(doi_dir)
-        self._save_preprint(doi_dir)
+        if self.doi is not None:
+            doi_dir = Path(directory) / stringify_doi(self.doi)
+            doi_dir.mkdir(parents=True, exist_ok=True)
+            self._save_reviews(doi_dir)
+            self._save_preprint(doi_dir)
+        else:
+            raise ValueError("No doi specified.")
 
     def from_dir(self, directory: Path):
         preprint_dir = directory / 'preprint'
@@ -44,11 +48,17 @@ class ReviewedPreprint:
 
     def _save_reviews(self, dir: Path):
         # save the individual referee reports to individual subdirectories
-        rev_dir = dir / f'review_process'
-        rev_dir.mkdir(exist_ok=True)
-        self.review_process.save(rev_dir)
+        if self.review_process is not None:
+            rev_dir = dir / f'review_process'
+            rev_dir.mkdir(exist_ok=True)
+            self.review_process.save(rev_dir)
+        else:
+            raise ValueError("No review process specified.")
 
     def _save_preprint(self, dir: Path):
-        preprint_dir = dir / 'preprint'
-        preprint_dir.mkdir(exist_ok=True)
-        self.preprint.save(preprint_dir)
+        if self.preprint is not None:
+            preprint_dir = dir / 'preprint'
+            preprint_dir.mkdir(exist_ok=True)
+            self.preprint.save(preprint_dir)
+        else:
+            raise ValueError("No preprint specified.")

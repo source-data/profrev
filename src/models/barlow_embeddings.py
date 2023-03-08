@@ -1,4 +1,5 @@
 import torch
+from typing import List
 from torch import nn
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
@@ -14,8 +15,10 @@ class LatentEmbedding:
         super().__init__()
         self.tokenizer = AutoTokenizer.from_pretrained('facebook/bart-base')
         pretrained_bart = AutoModelForSeq2SeqLM.from_pretrained('facebook/bart-base')
-        # full_twin_model = TwinSEQ2SEQ.from_pretrained(pretrained_barlow, pretrained=pretrained_bart)
-        full_twin_model = Twin.from_pretrained(pretrained_barlow, pretrained=pretrained_bart)
+        if "no-lm" in pretrained_barlow:  # no language model
+            full_twin_model = Twin.from_pretrained(pretrained_barlow, pretrained=pretrained_bart)
+        else:  # with language model
+            full_twin_model = TwinSEQ2SEQ.from_pretrained(pretrained_barlow, pretrained=pretrained_bart)
         encoder_idx = 0 if mode == 'sentence' else 1
         self.encoder: LatentEncoder = full_twin_model.encoders[encoder_idx]
         self.encoder.eval()
@@ -24,10 +27,8 @@ class LatentEmbedding:
             p.requires_grad = False
         self.seq_len = full_twin_model.config.seq_length
 
-    def __call__(self, inputs: str) -> torch.Tensor:
+    def __call__(self, inputs: List[str]) -> torch.Tensor:
         # test if string and make a list if so
-        if isinstance(inputs, str):
-            inputs = [inputs]
         tokenized = self.tokenizer(
             inputs,
             return_tensors="pt",
@@ -38,8 +39,8 @@ class LatentEmbedding:
         input_ids = tokenized['input_ids']
         outputs = self.encoder(input_ids)
         representation = outputs.representation
-        normalized = torch.nn.functional.normalize(representation)
-        return normalized
+        representation = torch.nn.functional.normalize(representation)
+        return representation
 
 
 class LatentSentenceEmbedding(LatentEmbedding):

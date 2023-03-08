@@ -18,12 +18,13 @@ class Embedder:
     Attributes:
         model: The model to use for the embedding.
     """
-    def __init__(self, model: str = None):
+    def __init__(self, model: str = ""):
         self.model = model
 
     @retry(wait=wait_random_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
-    def get_embedding(self, inputs: List[str]) -> Tuple[List[List[float]], Dict]:
+    def get_embedding(self, inputs: List[str]) ->  torch.Tensor:
         raise NotImplementedError
+
 
 class OpenAIEmbedder(Embedder):
     """A class to get open ai GPT embeddings.
@@ -34,19 +35,20 @@ class OpenAIEmbedder(Embedder):
         super().__init__(model)
 
     @retry(wait=wait_random_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
-    def get_embedding(self, inputs: List[str]) -> Tuple[torch.Tensor, Dict]:
+    def get_embedding(self, inputs: List[str]) -> torch.Tensor:
         """Get embeddings for a list of strings.
         Args:
             input: A list of strings to get embeddings for.
         Returns:
-            A list of embeddings, one for each string in the input.
+            A tensor with embeddings as rows, one for each string in the input.
         """
         results = openai.Embedding.create(input=inputs, model=self.model)
         embeddings: List[List[float]] = [r['embedding'] for r in results['data']]
-        results.pop('data')
+        # results.pop('data')  # some metadata, not used for now
         embeddings = torch.Tensor(embeddings)
-        return embeddings, results
-    
+        return embeddings  # num_examples x embedding_dim
+
+
 class SBERTEmbedder(Embedder):
     """A class to get embeddings from sentence transfomer SBERT.
     Attributes:
@@ -58,15 +60,15 @@ class SBERTEmbedder(Embedder):
         self.transformer.max_seq_length = 512
 
     @retry(wait=wait_random_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
-    def get_embedding(self, inputs: List[str]) -> Tuple[torch.Tensor, Dict]:
+    def get_embedding(self, inputs: List[str]) -> torch.Tensor:
         """Get embeddings for a list of strings.
         Args:
             input: A list of strings to get embeddings for.
         Returns:
-            A list of embeddings, one for each string in the input.
+            A tensor with embeddings as rows, one for each string in the input.
         """
-        embeddings = self.transformer.encode(inputs, convert_to_tensor=True)
-        return embeddings, {}
+        embeddings = self.transformer.encode(inputs, normalize_embeddings=True, convert_to_tensor=True)
+        return embeddings  # num_examples x embedding_dim
     
 class BarlowEmbedder(Embedder):
     """A class to get embeddings from Barlow Twins embeddings.
@@ -75,16 +77,15 @@ class BarlowEmbedder(Embedder):
         super().__init__(model)
         self.latent_encoder = LatentEmbedding(model, mode)
 
-    @retry(wait=wait_random_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
-    def get_embedding(self, inputs: List[str]) -> Tuple[torch.Tensor, Dict]:
+    def get_embedding(self, inputs: List[str]) -> torch.Tensor:
         """Get embeddings for a list of strings.
         Args:
             input: A list of strings to get embeddings for.
         Returns:
-            A list of embeddings, one for each string in the input.
+
         """
         embeddings = self.latent_encoder(inputs)
-        return embeddings, {}
+        return embeddings  # num_examples x embedding_dim
     
 class BarlowSentenceEmbedder(BarlowEmbedder):
     """A class to get embeddings from Barlow Twins sentence embeddings.

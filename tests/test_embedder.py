@@ -2,7 +2,10 @@ import unittest
 import torch
 import openai
 
-from src.embed import OpenAIEmbedder, SBERTEmbedder, BarlowEmbedder
+from src.embed import (
+    OpenAIEmbedder, SBERTEmbedder,
+    BarlowEmbedder,
+)
 from src.config import config
 
 """Test cases for testing the methods of the Bipartite class"""
@@ -27,19 +30,17 @@ class TestEmbedder(unittest.TestCase):
         self.assertTrue(list is not None)
 
     def test_openai_embedder(self):
-        embeddings, metadata = self.openai_embedder.get_embedding(self.samples)
+        embeddings = self.openai_embedder.get_embedding(self.samples)
         self.assertIsInstance(embeddings, torch.Tensor)
         self.assertEqual(list(embeddings.size()), [len(self.samples), 1536])
-        self.assertEqual(metadata['model'].replace(':', '-'), config.embedding_model['openai'])
 
     def test_sbert_embedder(self):
-        embeddings, _ = self.sbert_embedder.get_embedding(self.samples)
+        embeddings = self.sbert_embedder.get_embedding(self.samples)
         self.assertIsInstance(embeddings, torch.Tensor)
         self.assertEqual(list(embeddings.size()), [len(self.samples), 768])
         
     def test_barlow_embedder(self):
         barlow_embedder = BarlowEmbedder()
-        embeddings, _ = barlow_embedder.get_embedding(self.samples)
+        embeddings = barlow_embedder.get_embedding(self.samples)
         self.assertIsInstance(embeddings, torch.Tensor)
-        self.assertEqual(list(embeddings.size()), [len(self.samples), 96])
-        
+        self.assertEqual(list(embeddings.size()), [len(self.samples), 512])
