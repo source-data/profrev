@@ -19,7 +19,7 @@ class Config:
 
 
 config = Config(
-    min_length=70,
+    min_length=10,
     embedding_model={
         # https://platform.openai.com/docs/models/gpt-3
         "openai": "text-embedding-ada-002",  # "text-embedding-ada-002", "text-similarity-curie-001", "text-similarity-babbage-001", "text-similarity-davinci-001", 

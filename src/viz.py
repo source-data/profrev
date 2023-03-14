@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import torch
 import numpy as np
 
-from .embed import Embedder, SBERTEmbedder, BarlowParagraphEmbedder
+from .embed import Embedder, SBERTEmbedder, BarlowParagraphEmbedder, OpenAIEmbedder
 from .comparator import Comparator
 from .reviewed_preprint import ReviewedPreprint
 from .utils import split_paragraphs, split_sentences, split_sentences_nltk, stringify_doi
@@ -63,14 +63,25 @@ CHUNKING_FNS = {
     "sentences": split_sentences,  # split_sentences_nltk
 }
 # EMBEDDER = SBERTEmbedder()
-EMBEDDER = BarlowParagraphEmbedder()
+# EMBEDDER = BarlowParagraphEmbedder()
+EMBEDDER = OpenAIEmbedder()
 COMPARATOR = ComparisonVis(embedder=EMBEDDER)
 DEFAULT_CUTOFF = 0.5
 DEFAULT_SIM_MATRIX = torch.tensor([[0] * 20] * 15)
 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-app = Dash(__name__, external_stylesheets=external_stylesheets)
-# app = Dash(__name__)
+# https://dash.plotly.com/external-resources#adding-external-css/javascript
+# external_stylesheets = [
+
+    # 'https://codepen.io/chriddyp/pen/bWLwgP.css',
+    # {
+    #     'href': 'https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css',
+    #     'rel': 'stylesheet',
+    #     'integrity': 'sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO',
+    #     'crossorigin': 'anonymous'
+    # }
+# ]
+# app = Dash(__name__, external_stylesheets=external_stylesheets)
+app = Dash(__name__)
 
 styles = {
     'pre': {
@@ -118,7 +129,19 @@ app.layout = html.Div([
         ]),
         html.Div(className="six columns", children=[
             html.H4("Preprint"),
-            dcc.Dropdown(['introduction', 'methods', 'results', 'figures', 'discussion'], DEFAULT_SECTION, id='section', searchable=False),
+            dcc.Dropdown([
+                'introduction',
+                'results',
+                'result_headings',
+                'discussion',
+                'methods',
+                'figures',
+                'fig_titles'
+            ],
+            DEFAULT_SECTION,
+            id='section',
+            searchable=False
+        ),
             dcc.Textarea(
                 id="sample-1",
                 placeholder="type your sentence here...",
@@ -153,7 +176,7 @@ app.layout = html.Div([
     html.Div(className='row', children=[
         dcc.Graph(
             id='heatmap',
-            # figure=px.imshow(DEFAULT_SIM_MATRIX, template='seaborn'),
+            figure=px.imshow(DEFAULT_SIM_MATRIX, template='seaborn'),
         )
     ]),
     html.Div(className='row', children=[
@@ -246,11 +269,10 @@ def update_figure(sim_matrix, cutoff):
     fig = px.imshow(
         sim_matrix,
         template="seaborn",
-        # marginal_y="box"
     )
-    fig.update_layout(showlegend=False)
-    fig.update_xaxes(visible=False, showticklabels=False)
-    fig.update_yaxes(visible=False, showticklabels=False)
+    fig.update_layout(title=f"embedding with {EMBEDDER.model} at cutoff {cutoff:.2f}",)
+    fig.update_xaxes(visible=True, showticklabels=True, side='top',)
+    fig.update_yaxes(visible=True, showticklabels=True, side='left')
     return fig
 
 

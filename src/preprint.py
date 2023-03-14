@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field, InitVar, asdict
 from lxml.etree import XMLParser, parse, Element
+from copy import deepcopy
 from tenacity import retry, stop_after_attempt, wait_fixed
 import requests
 import json
@@ -95,7 +96,9 @@ class Preprint:
             self.sections = {
                 "introduction": "",
                 "results": "",
+                "result_headings": "",
                 "figures": "",
+                "fig_titles": "",
                 "methods": "",
                 "discussion": ""
             }
@@ -113,7 +116,9 @@ class Preprint:
         sections = {
             "introduction": self._introduction(xml),
             "results": self._results(xml),
+            "result_headings": self._result_headings(xml),
             "figures": self._figures(xml),
+            "fig_titles": self._fig_titles(xml),
             "methods": self._methods(xml),
             "discussion": self._discussion(xml)
         }
@@ -156,10 +161,18 @@ class Preprint:
     @property
     def results(self):
         return self.sections['results']
+
+    @property
+    def result_headings(self):
+        return self.sections['result_headings']
     
     @property
     def figures(self):
         return self.sections['figures']
+
+    @property
+    def fig_titles(self):
+        return self.sections['fig_titles']
 
     @property
     def methods(self):
@@ -189,11 +202,20 @@ class Preprint:
     def _results(self, xml: Element) -> str:
         """Extract the results section of the preprint using the JATS XML and the appropriate XPath."""
         # Results, Results and Discussion
-        return self._extract_section('//sec/title[re:match(text(), "^result", "i")]/..//p', xml)
+        return self._extract_section('//sec/title[re:match(text(), "^result", "i")]/..//p', xml, internal_element_to_remove='//fig')
+
+    def _result_headings(self, xml: Element) -> str:
+        """Extract the results headings section of the preprint using the JATS XML and the appropriate XPath."""
+        # Results, Results and Discussion
+        return self._extract_section('//sec/title[re:match(text(), "^result", "i")]/../sec/title', xml)
     
     def _figures(self, xml: Element) -> str:
         """Extract the figures section of the preprint using the JATS XML and the appropriate XPath."""
         return self._extract_section('//fig/caption', xml, remove_newlines_first=True)
+    
+    def _fig_titles(self, xml: Element) -> str:
+        """Extract the figure title section of the preprint using the JATS XML and the appropriate XPath."""
+        return self._extract_section('//fig/caption/title', xml)
 
     def _methods(self, xml: Element) -> str:
         """Extract the methods section of the preprint using the JATS XML and the appropriate XPath."""
@@ -204,8 +226,13 @@ class Preprint:
         # Has to start with discussion to disambiguate from "Results and Discussion" combined section
         return self._extract_section('//sec/title[re:match(text(), "^discussion", "i")]/..//p', xml)
 
-    def _extract_section(self, xpath: str, xml: Element, remove_newlines_first:bool = False) -> str:
+    def _extract_section(self, xpath: str, xml: Element, remove_newlines_first:bool = False, internal_element_to_remove: str='') -> str:
         """Extract a section of the preprint using the JATS XML and the appropriate XPath."""
+        if internal_element_to_remove:
+            xml = deepcopy(xml)  # don't modify the original xml
+            internal_elements = xml.xpath(internal_element_to_remove, namespaces={"re": "http://exslt.org/regular-expressions"})
+            for el in internal_elements:
+                el.getparent().remove(el)
         elements = xml.xpath(xpath, namespaces={"re": "http://exslt.org/regular-expressions"})  # namespace prefix to enable regex usage in XPath
         return self._extract_text(elements, remove_newlines_first)
 

@@ -35,6 +35,14 @@ def stringify_doi(doi: str) -> str:
 
 BOILERPLATE = [
     "This preprint has been reviewed by subject experts for *Review Commons*",
+    "Content has not been altered except for formatting.",
+    "Learn more at [Review Commons](https://reviewcommons.org)",
+    "### Referee \#",
+    "### Reviewer \#",
+    "#### Evidence, reproducibility and clarity",
+    "**Minor",
+    "**Major",
+    "#### Significance",
 ]
 
 
