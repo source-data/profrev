@@ -11,6 +11,7 @@ RUN pip install --upgrade pip
 #&& pip install -r /requirements.txt
 RUN pip install python-dotenv
 RUN pip install spacy
+RUN pip install nltk
 RUN pip install torch
 RUN pip install requests
 # check it out https://github.com/jd/tenacity
@@ -33,12 +34,17 @@ RUN python -m spacy download en_core_web_sm
 RUN pip install plotly
 RUN pip install dash==2.5.0
 RUN pip install jupyter-dash
+# to save images from plotly
+RUN pip install kaleido
 
 FROM python:3.10-slim AS build-image
 
 COPY --from=compile-image /opt/venv /opt/venv
 # Make sure we use the virtualenv:
 ENV PATH="/opt/venv/bin:$PATH"
+
+RUN python -c "import nltk; nltk.download('punkt')"
+RUN pip install scipy==1.10.1
 
 # Set the working directory in the container
 WORKDIR /app

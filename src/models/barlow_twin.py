@@ -119,6 +119,7 @@ class LatentConfig(BartConfig):
         sampling_iterations: int = 100,
         seq_length: int = 512,
         latent_var_loss: str = 'mmd',
+        latent_type: str = 'mlp', # 'mean', 'max'
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -128,6 +129,7 @@ class LatentConfig(BartConfig):
         self.sampling_iterations = sampling_iterations
         self.seq_length = seq_length
         self.latent_var_loss = latent_var_loss
+        self.latent_type = latent_type
 
 
 class TwinConfig(LatentConfig):
@@ -184,6 +186,7 @@ class TwinLMOutput(ModelOutput):
     supp_data: Dict[str, torch.Tensor] = None
 
 
+
 class LatentEncoder(BartEncoder):
 
     def __init__(
@@ -193,6 +196,7 @@ class LatentEncoder(BartEncoder):
     ):
         super().__init__(config)
         self.config = config
+        self.latent_type = config.latent_type
         self.freeze_pretrained = self.config.freeze_pretrained
         self.model = pretrained_encoder
         # freeze the pretrained model
@@ -207,30 +211,38 @@ class LatentEncoder(BartEncoder):
         self.d_encoder = self.model.config.d_model
         self.seq_length = self.config.seq_length
         self.pad_token_id = self.model.config.pad_token_id
+
         # latent vars
         self.hidden_features = self.config.hidden_features
         self.sampling_iterations = self.config.sampling_iterations
-        self.z_dim = self.config.z_dim
+
+        if self.latent_type == 'mlp':
+            # latent variable results from compression and mlp vectorization
+            self.z_dim = self.config.z_dim
+        elif self.latent_type == 'mean':
+            # latent variable is same size as hidden size output of pretrained encoder
+            self.z_dim = self.d_encoder
         self.latent_var_loss = self.config.latent_var_loss
         # own layers
-        self.act_fct = nn.GELU()
         self.vae_dropout = nn.Dropout(p=config.dropout)
-        self.fc_compress = nn.Linear(self.d_encoder, self.hidden_features)
-        self.norm_compress = nn.LayerNorm(self.hidden_features, elementwise_affine=False)
-        if self.latent_var_loss == "mmd" or self.latent_var_loss is None:   # infoVAE
-            self.fc_z_1 = nn.Linear(self.seq_length * self.hidden_features, self.z_dim)
-        elif self.latent_var_loss == "kl" or "kl-mc":   # classical VAE
-            self.fc_z_mean = nn.Linear(self.seq_length * self.hidden_features, self.z_dim)
-            self.fc_z_logvar = nn.Linear(self.seq_length * self.hidden_features, self.z_dim)
-        else:
-            raise ValueError(f"unknown loss type on latent variable {self.latent_var_loss}")
         self.norm_z = nn.LayerNorm(self.z_dim, elementwise_affine=False)
+        if self.latent_type == "mlp":
+            self.act_fct = nn.GELU()
+            self.fc_compress = nn.Linear(self.d_encoder, self.hidden_features)
+            self.norm_compress = nn.LayerNorm(self.hidden_features, elementwise_affine=False)
+            if self.latent_var_loss == "mmd" or self.latent_var_loss is None:   # infoVAE
+                self.fc_z_1 = nn.Linear(self.seq_length * self.hidden_features, self.z_dim)
+            elif self.latent_var_loss == "kl" or "kl-mc":   # classical VAE
+                self.fc_z_mean = nn.Linear(self.seq_length * self.hidden_features, self.z_dim)
+                self.fc_z_logvar = nn.Linear(self.seq_length * self.hidden_features, self.z_dim)
+            else:
+                raise ValueError(f"unknown loss type on latent variable {self.latent_var_loss}")
 
     def forward(
         self,
         input_ids=None,
+        attention_mask=None,
         **kwargs,
-        # attention_mask=None,
         # head_mask=None,
         # inputs_embeds=None,
         # output_attentions=None,
@@ -238,54 +250,71 @@ class LatentEncoder(BartEncoder):
         # return_dict=None,
     ) -> LatentEncoderOutput:
         # encoder
-        encoder_outputs: BaseModelOutput = self.model(input_ids=input_ids, **kwargs)
+        encoder_outputs: BaseModelOutput = self.model(input_ids=input_ids, attention_mask=None, **kwargs)
         x = encoder_outputs.last_hidden_state  # -> B x L x H_enc
         if self.freeze_pretrained in ['encoder', 'both']:
             x.requires_grad_(True)
         batch_size, length, hidden_size = x.size()  # batch_size B, length L, hidden_size H_enc
         assert length == self.seq_length, f"observed seq length {length} mismatches with config.seq_length {self.seq_length} with input_ids.size()={input_ids.size()}"
-        # compress
-        y = x  # keep x for later as residual
-        y = self.vae_dropout(y)
-        y = self.fc_compress(y)  # -> B x L x H (example: 32 example x 256 token x 256 hidden features)
-        y = self.norm_compress(y)
-        y = self.act_fct(y)
-        hidden_before_latent = y  # for visualization
-        y = y.view(batch_size, (self.seq_length * self.hidden_features))  # B x (L * H)  (example: 32 * 65_536)
-        # latent var
-        y = self.vae_dropout(y)
-        if self.latent_var_loss == "mmd":
-            z = self.fc_z_1(y)  # -> B x Z  (example: 32 example x 128 dimensional latent var)
-            z = self.norm_z(z)
-            loss = compute_mmd_loss(z, self.sampling_iterations)
+        assert hidden_size == self.d_encoder, f"hidden feature size of encoder output {hidden_size} is unexpected given encoder hidden feature size {self.d_encoder}"
+        y = self.vae_dropout(x)
+        if self.latent_type == "mlp":
+            # compress
+            y = self.fc_compress(y)  # -> B x L x H (example: 32 example x 256 token x 256 hidden features)
+            y = self.norm_compress(y)
+            y = self.act_fct(y)
+            hidden_before_latent = y  # for visualization
+            y = y.view(batch_size, (self.seq_length * self.hidden_features))  # B x (L * H)  (example: 32 * 65_536)
+            # latent var
+            y = self.vae_dropout(y)
+            if self.latent_var_loss == "mmd":
+                z = self.fc_z_1(y)  # -> B x Z  (example: 32 example x 128 dimensional latent var)
+                z = self.norm_z(z)
+                loss = compute_mmd_loss(z, self.sampling_iterations)
+                representation = z
+            elif self.latent_var_loss == "kl":
+                z_mean = self.fc_z_mean(y)  # -> B x Z
+                z_logvar = self.fc_z_logvar(y)  # -> B x Z
+                z_std = torch.exp(0.5 * z_logvar)
+                # z = sample_z(self.z_dim, batch_size)
+                # z = z + z_mean + z_std
+                q = torch.distributions.Normal(z_mean, z_std)
+                z = q.rsample()
+                representation = self.norm_z(z_mean)  # for twin cross correlation: take latent before sampling
+                loss = compute_kl_loss(z_mean, z_logvar)
+            elif self.latent_var_loss == "kl-mc":
+                z_mean = self.fc_z_mean(y)  # -> B x Z
+                z_logvar = self.fc_z_logvar(y)  # -> B x Z
+                z_std = torch.exp(0.5 * z_logvar / 2)
+                q = torch.distributions.Normal(z_mean, z_std)
+                z = q.rsample()
+                representation = self.norm_z(z_mean)  # for twin cross correlation: take latent before sampling
+                loss = monte_carlo_kl_divergence(z, z_mean, z_std)
+            elif self.latent_var_loss is None:
+                z = self.fc_z_1(y)  # -> B x Z  (example: 32 example x 128 dimensional latent var)
+                z = self.norm_z(z)
+                loss = torch.tensor(0)
+                if torch.cuda.is_available():
+                    loss = loss.cuda()
+                representation = z
+            else:
+                raise ValueError(f"unknown loss type on latent variable {self.latent_var_loss}")
+        elif self.latent_type == 'mean':
+            # attention_mask dimension is batch size x seq length
+            # needs to be expaned to batch size x seq length x hidden size
+            mask_expanded = attention_mask.unsqueeze(-1).expand(-1, -1, hidden_size).float()
+            masked_y = y * mask_expanded
+            hidden_before_latent = masked_y  # for visualization
+            summed_y = masked_y.sum(1)  # sum along seq length
+            summed_masks = mask_expanded.sum(1)  # count non masked element along seq length
+            mean = summed_y / summed_masks
+            z = self.norm_z(mean)  # batch size x hidden size
             representation = z
-        elif self.latent_var_loss == "kl":
-            z_mean = self.fc_z_mean(y)  # -> B x Z
-            z_logvar = self.fc_z_logvar(y)  # -> B x Z
-            z_std = torch.exp(0.5 * z_logvar)
-            # z = sample_z(self.z_dim, batch_size)
-            # z = z + z_mean + z_std
-            q = torch.distributions.Normal(z_mean, z_std)
-            z = q.rsample()
-            representation = self.norm_z(z_mean)  # for twin cross correlation: take latent before sampling
-            loss = compute_kl_loss(z_mean, z_logvar)
-        elif self.latent_var_loss == "kl-mc":
-            z_mean = self.fc_z_mean(y)  # -> B x Z
-            z_logvar = self.fc_z_logvar(y)  # -> B x Z
-            z_std = torch.exp(0.5 * z_logvar / 2)
-            q = torch.distributions.Normal(z_mean, z_std)
-            z = q.rsample()
-            representation = self.norm_z(z_mean)  # for twin cross correlation: take latent before sampling
-            loss = monte_carlo_kl_divergence(z, z_mean, z_std)
-        elif self.latent_var_loss is None:
-            z = self.fc_z_1(y)  # -> B x Z  (example: 32 example x 128 dimensional latent var)
-            z = self.norm_z(z)
             loss = torch.tensor(0)
             if torch.cuda.is_available():
                 loss = loss.cuda()
-            representation = z
         else:
-            raise ValueError(f"unknown loss type on latent variable {self.latent_var_loss}")
+            raise ValueError(f"unkonwn latent type {self.lagent_type}")
 
         supp_data = {
             "loss_z": loss,

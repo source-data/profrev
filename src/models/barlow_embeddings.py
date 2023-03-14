@@ -6,6 +6,7 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from .barlow_twin import Twin, TwinSEQ2SEQ, LatentEncoder
 from ..config import config
 
+
 PRETRAINED_BARLOW = config.embedding_model['barlow']
 
 
@@ -37,7 +38,7 @@ class LatentEmbedding:
             truncation=True
         )
         input_ids = tokenized['input_ids']
-        outputs = self.encoder(input_ids)
+        outputs = self.encoder(**tokenized)
         representation = outputs.representation
         representation = torch.nn.functional.normalize(representation)
         return representation

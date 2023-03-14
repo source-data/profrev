@@ -1,6 +1,8 @@
 from lxml.etree import Element
 from typing import List
 import spacy
+import nltk
+nltk.download('punkt')
 import re
 
 from .config import config
@@ -57,6 +59,7 @@ def split_paragraphs(text: str) -> List[str]:
     filtered = filtering(para)
     return filtered
 
+
 def split_sentences(text: str) -> List[str]:
     """Split text into sentences.
     Args:   
@@ -68,5 +71,18 @@ def split_sentences(text: str) -> List[str]:
     sentences = [sent.text for sent in doc.sents]
     filtered = filtering(sentences)
     return filtered
+
+
+def split_sentences_nltk(text: str) -> List[str]:
+    """Split text into sentences with nltk
+    Args:   
+        text: The text to split into sentences.
+    Returns:
+        A list of sentences.
+    """
+    sentences = nltk.sent_tokenize(text)
+    filtered = filtering(sentences)
+    return filtered
+
 
 doi_str_re = re.compile(r'^10_\d{4,9}-[-._;()/:A-Z0-9]+$', re.IGNORECASE)

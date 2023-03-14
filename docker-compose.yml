@@ -11,9 +11,9 @@ services:
     volumes:
     - ./src:/app/src
     - ./tests:/app/tests
-    - ./pretrained:/app/pretrained
-    - ./img:/app/img
-    - ./data:/app/data
+    - ./pretrained:/pretrained
+    - ./img:/img
+    - ./data:/data
     - ./log:/log
     - ./notebooks:/app/notebooks
     - vs_server:/root/.vscode-server

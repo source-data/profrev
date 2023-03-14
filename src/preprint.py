@@ -95,6 +95,7 @@ class Preprint:
             self.sections = {
                 "introduction": "",
                 "results": "",
+                "figures": "",
                 "methods": "",
                 "discussion": ""
             }
@@ -112,6 +113,7 @@ class Preprint:
         sections = {
             "introduction": self._introduction(xml),
             "results": self._results(xml),
+            "figures": self._figures(xml),
             "methods": self._methods(xml),
             "discussion": self._discussion(xml)
         }
@@ -154,6 +156,10 @@ class Preprint:
     @property
     def results(self):
         return self.sections['results']
+    
+    @property
+    def figures(self):
+        return self.sections['figures']
 
     @property
     def methods(self):
@@ -184,6 +190,10 @@ class Preprint:
         """Extract the results section of the preprint using the JATS XML and the appropriate XPath."""
         # Results, Results and Discussion
         return self._extract_section('//sec/title[re:match(text(), "^result", "i")]/..//p', xml)
+    
+    def _figures(self, xml: Element) -> str:
+        """Extract the figures section of the preprint using the JATS XML and the appropriate XPath."""
+        return self._extract_section('//fig/caption', xml, remove_newlines_first=True)
 
     def _methods(self, xml: Element) -> str:
         """Extract the methods section of the preprint using the JATS XML and the appropriate XPath."""
@@ -194,14 +204,27 @@ class Preprint:
         # Has to start with discussion to disambiguate from "Results and Discussion" combined section
         return self._extract_section('//sec/title[re:match(text(), "^discussion", "i")]/..//p', xml)
 
-    def _extract_section(self, xpath: str, xml: Element) -> str:
+    def _extract_section(self, xpath: str, xml: Element, remove_newlines_first:bool = False) -> str:
         """Extract a section of the preprint using the JATS XML and the appropriate XPath."""
         elements = xml.xpath(xpath, namespaces={"re": "http://exslt.org/regular-expressions"})  # namespace prefix to enable regex usage in XPath
-        return self._extract_text(elements)
+        return self._extract_text(elements, remove_newlines_first)
 
-    def _extract_text(self, elements: List[Element]) -> str:
-        """Extract the innertext from list of xml etree Elements. Paragraphs are joined with double newline."""
-        return '\n\n'.join([innertext(el) for el in elements])
+    def _extract_text(self, elements: List[Element], remove_newlines_first: bool = False) -> str:
+        """Extract the innertext from list of xml etree Elements. Paragraphs are joined with double newline.
+        Args:
+            elements: The list of etree Elements.
+            remove_newlines_first: Whether to remove newlines from the text of each element first.
+        """
+        if remove_newlines_first:
+            text_elements = []
+            for el in elements:
+                text = innertext(el)
+                if text: 
+                    text = text.replace('\n', ' ')
+                    text_elements.append(text)
+            return '\n\n'.join(text_elements)
+        else:
+            return '\n\n'.join([innertext(el) for el in elements])
     
     def get_chunks(self, chunking_fn: Callable, sections: str = config.sections) -> List[str]:
         """Return the paragraphs of a sections of the preprint.

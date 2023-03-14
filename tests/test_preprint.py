@@ -21,6 +21,8 @@ class TestPreprint(unittest.TestCase):
         cls.intro_end = "human antibody immunity can inform surveillance of ongoing viral evolution."
         cls.results_start = "We characterized the serum antibodies from 35 plasma samples"
         cls.results_end = "are also worth monitoring, since they also have antigenic impacts."
+        cls.figures_start = "RBD-binding antibodies are responsible for most of the neutralizing activity of human polyclonal sera"
+        cls.figures_end = "The numerical IC50s from all curves in both panels are available at https://github.com/jbloomlab/SARS-CoV-2-RBD_MAP_HAARVI_sera/blob/main/experimental_validations/results/mutant_neuts_results/mutants_foldchange_ic50.csv."
         cls.methods_start = "We provide data and code in the following ways"
         cls.methods_end = "scanning measurements of how mutations affect ACE2 binding or RBD expression as described above."
         cls.discussion_start = "We comprehensively mapped how mutations to the SARS-CoV-2 RBD"
@@ -77,6 +79,12 @@ class TestPreprint(unittest.TestCase):
         results = self.preprint.results
         self.assertTrue(results.startswith(self.results_start))
         self.assertTrue(results.endswith(self.results_end))
+
+    # test the figures method
+    def test_figures(self):
+        figures = self.preprint.figures
+        self.assertTrue(figures.startswith(self.figures_start))
+        self.assertTrue(figures.endswith(self.figures_end))
 
     # test the methods method
     def test_methods(self):
